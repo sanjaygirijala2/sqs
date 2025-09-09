@@ -1,0 +1,30 @@
+# application-dev.yml
+spring:
+  profiles: dev
+
+aws:
+  region: us-east-1
+
+sqs:
+  queue-name: 111811-omnichannel-router-queue-us-east-1-dev.fifo
+
+logging:
+  level:
+    io.awspring.cloud: DEBUG
+    software.amazon.awssdk: DEBUG
+
+---
+# application-prod.yml
+spring:
+  profiles: prod
+
+aws:
+  region: us-east-1
+
+sqs:
+  queue-name: 111811-omnichannel-router-queue-us-east-1.fifo
+
+logging:
+  level:
+    io.awspring.cloud: INFO
+    software.amazon.awssdk: WARN
