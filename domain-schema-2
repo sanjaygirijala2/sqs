@@ -1,0 +1,756 @@
+import java.util.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+/**
+ * Complete in-memory notification platform with JSON Schema validation
+ * Using the exact payload structure: capability, recipients, and payload array
+ */
+public class NotificationPlatformWithJsonSchema {
+    
+    public static void main(String[] args) {
+        // Initialize the platform
+        NotificationPlatform platform = new NotificationPlatform();
+        
+        // Step 1: Setup Domains
+        System.out.println("=== SETTING UP NOTIFICATION PLATFORM ===\n");
+        setupDomains(platform);
+        
+        // Step 2: Setup JSON Schemas (stored as JSON Schema format)
+        setupJsonSchemas(platform);
+        
+        // Step 3: Setup Routes (mapping routes to domains and schemas)
+        setupRoutes(platform);
+        
+        // Step 4: Setup Capabilities
+        setupCapabilities(platform);
+        
+        // Demo 1: Send workspace booking notification (exact payload structure)
+        System.out.println("\n=== DEMO 1: WORKSPACE BOOKING NOTIFICATION ===\n");
+        sendWorkspaceBookingNotification(platform);
+        
+        // Demo 2: Send learning assignment notification
+        System.out.println("\n=== DEMO 2: LEARNING ASSIGNMENT NOTIFICATION ===\n");
+        sendLearningNotification(platform);
+        
+        // Demo 3: Validation failure example
+        System.out.println("\n=== DEMO 3: VALIDATION FAILURE EXAMPLE ===\n");
+        sendInvalidNotification(platform);
+        
+        // Show platform statistics
+        System.out.println("\n=== PLATFORM STATISTICS ===\n");
+        platform.printStatistics();
+        
+        // Show stored schemas (as they would appear in MongoDB)
+        System.out.println("\n=== STORED SCHEMAS IN MONGODB FORMAT ===\n");
+        platform.printStoredSchemas();
+    }
+    
+    private static void setupDomains(NotificationPlatform platform) {
+        // Mobile domain with strict constraints
+        platform.registerDomain(new Domain(
+            "mobile.push.jpmc",
+            "Mobile Platform Team",
+            Map.of(
+                "max_title_length", "25",
+                "max_body_length", "50",
+                "platform_type", "FCM",
+                "delivery_plugin", "com.jpmc.notification.FCMPlugin",
+                "rate_limit", "1000/second"
+            )
+        ));
+        
+        // Desktop domain with richer content
+        platform.registerDomain(new Domain(
+            "desktop.rich.jpmc",
+            "Desktop Platform Team",
+            Map.of(
+                "max_title_length", "100",
+                "max_body_length", "300",
+                "platform_type", "Windows_Notification_Service",
+                "delivery_plugin", "com.jpmc.notification.WNSPlugin",
+                "supports_rich_media", "true",
+                "supports_actions", "true"
+            )
+        ));
+        
+        // Email domain
+        platform.registerDomain(new Domain(
+            "email.formal.jpmc",
+            "Email Platform Team",
+            Map.of(
+                "max_subject_length", "100",
+                "max_body_length", "2000",
+                "platform_type", "SMTP",
+                "delivery_plugin", "com.jpmc.notification.SMTPPlugin",
+                "smtp_server", "smtp.jpmc.internal"
+            )
+        ));
+    }
+    
+    private static void setupJsonSchemas(NotificationPlatform platform) {
+        // Mobile Push Schema v1 - Stored as JSON Schema format
+        JsonSchema mobilePushV1 = new JsonSchema("mobile.push.v1", "mobile.push.jpmc");
+        mobilePushV1.setSchemaUri("https://jpmc.com/schemas/mobile.push.v1");
+        mobilePushV1.addProperty("title", new SchemaProperty("string", 1, 25, true));
+        mobilePushV1.addProperty("body", new SchemaProperty("string", 1, 50, true));
+        mobilePushV1.addProperty("action_url", new SchemaProperty("string", 0, 200, false)
+            .withPattern("^(https?://|myworkspace://)"));
+        mobilePushV1.addProperty("badge_count", new SchemaProperty("integer", 0, 999, false));
+        mobilePushV1.addProperty("priority", new SchemaProperty("string", 
+            Arrays.asList("low", "normal", "high", "urgent"), false));
+        platform.registerSchema(mobilePushV1);
+        
+        // Desktop Rich Schema v1 - More complex with nested objects
+        JsonSchema desktopRichV1 = new JsonSchema("desktop.rich.v1", "desktop.rich.jpmc");
+        desktopRichV1.setSchemaUri("https://jpmc.com/schemas/desktop.rich.v1");
+        desktopRichV1.addProperty("header", new SchemaProperty("string", 0, 50, false));
+        desktopRichV1.addProperty("title", new SchemaProperty("string", 1, 100, true));
+        desktopRichV1.addProperty("body", new SchemaProperty("string", 1, 300, true));
+        desktopRichV1.addProperty("footer", new SchemaProperty("string", 0, 100, false));
+        desktopRichV1.addProperty("icon", new SchemaProperty("string",
+            Arrays.asList("info", "warning", "success", "error", "calendar", "task"), false));
+        
+        // Buttons as array of objects
+        SchemaProperty buttons = new SchemaProperty("array", 0, 3, false);
+        buttons.setItemSchema(Map.of(
+            "label", Map.of("type", "string", "maxLength", 20),
+            "action", Map.of("type", "string", "enum", Arrays.asList("open", "dismiss", "snooze", "complete")),
+            "url", Map.of("type", "string", "format", "uri")
+        ));
+        desktopRichV1.addProperty("buttons", buttons);
+        platform.registerSchema(desktopRichV1);
+        
+        // Email Formal Schema v1
+        JsonSchema emailFormalV1 = new JsonSchema("email.formal.v1", "email.formal.jpmc");
+        emailFormalV1.setSchemaUri("https://jpmc.com/schemas/email.formal.v1");
+        emailFormalV1.addProperty("subject", new SchemaProperty("string", 5, 100, true)
+            .withPattern("^[^\\n\\r]*$"));
+        emailFormalV1.addProperty("body", new SchemaProperty("string", 10, 2000, true));
+        emailFormalV1.addProperty("template_id", new SchemaProperty("string", "^tpl_[a-zA-Z0-9]+$", false));
+        platform.registerSchema(emailFormalV1);
+    }
+    
+    private static void setupRoutes(NotificationPlatform platform) {
+        // Routes map application endpoints to domains and schemas
+        platform.registerRoute(new Route("mobile.myworkspace", "mobile.push.jpmc", "mobile.push.v1"));
+        platform.registerRoute(new Route("desktop.myworkspace", "desktop.rich.jpmc", "desktop.rich.v1"));
+        platform.registerRoute(new Route("email.myworkspace", "email.formal.jpmc", "email.formal.v1"));
+        
+        // Additional routes for other applications
+        platform.registerRoute(new Route("mobile.learning", "mobile.push.jpmc", "mobile.push.v1"));
+        platform.registerRoute(new Route("desktop.learning", "desktop.rich.jpmc", "desktop.rich.v1"));
+    }
+    
+    private static void setupCapabilities(NotificationPlatform platform) {
+        // Capability: book_a_seat
+        Capability bookSeat = new Capability("book_a_seat", "Workspace reservation confirmations");
+        bookSeat.addSupportedRoute("mobile.myworkspace");
+        bookSeat.addSupportedRoute("desktop.myworkspace");
+        bookSeat.addSupportedRoute("email.myworkspace");
+        platform.registerCapability(bookSeat);
+        
+        // Capability: learning_assignment
+        Capability learning = new Capability("learning_assignment", "Training notifications");
+        learning.addSupportedRoute("mobile.learning");
+        learning.addSupportedRoute("desktop.learning");
+        platform.registerCapability(learning);
+    }
+    
+    private static void sendWorkspaceBookingNotification(NotificationPlatform platform) {
+        // Create notification request with exact payload structure from your example
+        NotificationRequest request = new NotificationRequest();
+        request.setCapability("book_a_seat");
+        request.addRecipient("john.doe@jpmc.com");
+        
+        // Mobile payload
+        NotificationPayload mobilePayload = new NotificationPayload();
+        mobilePayload.setRoute("mobile.myworkspace");
+        Map<String, Object> mobileMessage = new HashMap<>();
+        mobileMessage.put("title", "Seat Reserved");  // Validated by mobile.push.v1
+        mobileMessage.put("body", "Desk 42A booked");  // schema rules
+        mobileMessage.put("action_url", "myworkspace://booking/123");
+        mobileMessage.put("priority", "high");
+        mobileMessage.put("badge_count", 1);
+        mobilePayload.setMessage(mobileMessage);
+        request.addPayload(mobilePayload);
+        
+        // Desktop payload
+        NotificationPayload desktopPayload = new NotificationPayload();
+        desktopPayload.setRoute("desktop.myworkspace");
+        Map<String, Object> desktopMessage = new HashMap<>();
+        desktopMessage.put("header", "JPMC Workspace");
+        desktopMessage.put("title", "Workspace Reservation Confirmed");  // Validated by desktop.rich.v1
+        desktopMessage.put("body", "Your desk reservation for Desk 42A on Floor 3 has been confirmed for September 14, 2025");  // schema rules
+        desktopMessage.put("footer", "Questions? Contact facilities@jpmc.com");
+        desktopMessage.put("icon", "calendar");
+        desktopMessage.put("buttons", Arrays.asList(
+            Map.of("label", "View Details", "action", "open", "url", "https://workspace.jpmc.com/booking/123"),
+            Map.of("label", "Add to Calendar", "action", "complete")
+        ));
+        desktopPayload.setMessage(desktopMessage);
+        request.addPayload(desktopPayload);
+        
+        // Send notification
+        System.out.println("Sending notification request:");
+        System.out.println("Capability: " + request.getCapability());
+        System.out.println("Recipients: " + request.getRecipients());
+        System.out.println("Payloads: " + request.getPayloads().size() + " platform-specific messages\n");
+        
+        platform.send(request);
+    }
+    
+    private static void sendLearningNotification(NotificationPlatform platform) {
+        NotificationRequest request = new NotificationRequest();
+        request.setCapability("learning_assignment");
+        request.addRecipient("jane.smith@jpmc.com");
+        request.addRecipient("bob.wilson@jpmc.com");
+        
+        // Mobile payload
+        NotificationPayload mobilePayload = new NotificationPayload();
+        mobilePayload.setRoute("mobile.learning");
+        Map<String, Object> mobileMessage = new HashMap<>();
+        mobileMessage.put("title", "Training Due Oct 1");
+        mobileMessage.put("body", "Complete Compliance Training 2025");
+        mobileMessage.put("priority", "urgent");
+        mobilePayload.setMessage(mobileMessage);
+        request.addPayload(mobilePayload);
+        
+        // Desktop payload
+        NotificationPayload desktopPayload = new NotificationPayload();
+        desktopPayload.setRoute("desktop.learning");
+        Map<String, Object> desktopMessage = new HashMap<>();
+        desktopMessage.put("header", "Learning & Development");
+        desktopMessage.put("title", "Annual Compliance Training 2025");
+        desktopMessage.put("body", "You have been assigned the Annual Compliance Training. This mandatory training covers regulatory updates and best practices. Duration: 45 minutes.");
+        desktopMessage.put("footer", "Need help? Contact L&D at learning@jpmc.com");
+        desktopMessage.put("icon", "task");
+        desktopPayload.setMessage(desktopMessage);
+        request.addPayload(desktopPayload);
+        
+        System.out.println("Sending notification request:");
+        System.out.println("Capability: " + request.getCapability());
+        System.out.println("Recipients: " + request.getRecipients());
+        System.out.println("Payloads: " + request.getPayloads().size() + " platform-specific messages\n");
+        
+        platform.send(request);
+    }
+    
+    private static void sendInvalidNotification(NotificationPlatform platform) {
+        NotificationRequest request = new NotificationRequest();
+        request.setCapability("book_a_seat");
+        request.addRecipient("test@jpmc.com");
+        
+        // Invalid mobile payload - title too long
+        NotificationPayload invalidPayload = new NotificationPayload();
+        invalidPayload.setRoute("mobile.myworkspace");
+        Map<String, Object> invalidMessage = new HashMap<>();
+        invalidMessage.put("title", "This title is way too long for mobile push notifications and will fail validation");
+        invalidMessage.put("body", "Test");
+        invalidPayload.setMessage(invalidMessage);
+        request.addPayload(invalidPayload);
+        
+        System.out.println("Sending INVALID notification request:");
+        System.out.println("Title length: " + invalidMessage.get("title").toString().length() + " (max: 25)\n");
+        
+        platform.send(request);
+    }
+}
+
+// Core Platform Classes
+
+class NotificationPlatform {
+    private Map<String, Domain> domains = new HashMap<>();
+    private Map<String, JsonSchema> schemas = new HashMap<>();
+    private Map<String, Route> routes = new HashMap<>();
+    private Map<String, Capability> capabilities = new HashMap<>();
+    private List<NotificationLog> logs = new ArrayList<>();
+    private int totalSent = 0;
+    private int totalFailed = 0;
+    
+    public void registerDomain(Domain domain) {
+        domains.put(domain.getId(), domain);
+        System.out.println("✓ Registered domain: " + domain.getId() + 
+            " (Owner: " + domain.getOwnerTeam() + ")");
+    }
+    
+    public void registerSchema(JsonSchema schema) {
+        schemas.put(schema.getId(), schema);
+        System.out.println("✓ Registered schema: " + schema.getId() + 
+            " (URI: " + schema.getSchemaUri() + ")");
+    }
+    
+    public void registerRoute(Route route) {
+        routes.put(route.getId(), route);
+        System.out.println("✓ Registered route: " + route.getId() + 
+            " → " + route.getSchemaId());
+    }
+    
+    public void registerCapability(Capability capability) {
+        capabilities.put(capability.getId(), capability);
+        System.out.println("✓ Registered capability: " + capability.getId());
+    }
+    
+    public void send(NotificationRequest request) {
+        // Validate capability exists
+        Capability capability = capabilities.get(request.getCapability());
+        if (capability == null) {
+            System.out.println("❌ Error: Unknown capability: " + request.getCapability());
+            totalFailed++;
+            return;
+        }
+        
+        // Process each payload
+        for (NotificationPayload payload : request.getPayloads()) {
+            processPayload(capability, payload, request.getRecipients());
+        }
+    }
+    
+    private void processPayload(Capability capability, NotificationPayload payload, List<String> recipients) {
+        String routeId = payload.getRoute();
+        
+        // Get route
+        Route route = routes.get(routeId);
+        if (route == null) {
+            System.out.println("❌ Error: Unknown route: " + routeId);
+            totalFailed++;
+            return;
+        }
+        
+        // Check capability supports this route
+        if (!capability.supportsRoute(routeId)) {
+            System.out.println("❌ Error: Capability '" + capability.getId() + 
+                "' doesn't support route '" + routeId + "'");
+            totalFailed++;
+            return;
+        }
+        
+        // Get schema for validation
+        JsonSchema schema = schemas.get(route.getSchemaId());
+        if (schema == null) {
+            System.out.println("❌ Error: Schema not found: " + route.getSchemaId());
+            totalFailed++;
+            return;
+        }
+        
+        // Validate message against schema
+        System.out.println("Processing route: " + routeId);
+        System.out.println("Using schema: " + schema.getId());
+        
+        ValidationResult validation = schema.validate(payload.getMessage());
+        if (!validation.isValid()) {
+            System.out.println("❌ Validation failed:");
+            for (String error : validation.getErrors()) {
+                System.out.println("   - " + error);
+            }
+            totalFailed++;
+            return;
+        }
+        
+        // Get domain for delivery
+        Domain domain = domains.get(route.getDomainId());
+        if (domain == null) {
+            System.out.println("❌ Error: Domain not found: " + route.getDomainId());
+            totalFailed++;
+            return;
+        }
+        
+        // Simulate delivery through platform plugin
+        System.out.println("✓ Validation passed");
+        System.out.println("Delivering via: " + domain.getId() + " (" + domain.getGovernance().get("platform_type") + ")");
+        System.out.println("Plugin: " + domain.getGovernance().get("delivery_plugin"));
+        
+        // Display formatted notification
+        displayFormattedNotification(routeId, payload.getMessage());
+        
+        // Log successful delivery
+        for (String recipient : recipients) {
+            logs.add(new NotificationLog(
+                recipient, 
+                routeId, 
+                LocalDateTime.now(), 
+                true,
+                schema.getId()
+            ));
+        }
+        
+        totalSent += recipients.size();
+        System.out.println("✓ Delivered to " + recipients.size() + " recipient(s)\n");
+    }
+    
+    private void displayFormattedNotification(String routeId, Map<String, Object> message) {
+        if (routeId.startsWith("mobile")) {
+            System.out.println("\n📱 Mobile Push Notification:");
+            System.out.println("   Title: " + message.get("title"));
+            System.out.println("   Body: " + message.get("body"));
+            if (message.get("action_url") != null) {
+                System.out.println("   Action: " + message.get("action_url"));
+            }
+            if (message.get("priority") != null) {
+                System.out.println("   Priority: " + message.get("priority"));
+            }
+        } else if (routeId.startsWith("desktop")) {
+            System.out.println("\n💻 Desktop Rich Notification:");
+            if (message.get("header") != null) {
+                System.out.println("   [" + message.get("header") + "]");
+            }
+            System.out.println("   Title: " + message.get("title"));
+            System.out.println("   Body: " + truncate(message.get("body").toString(), 80) + "...");
+            if (message.get("footer") != null) {
+                System.out.println("   Footer: " + message.get("footer"));
+            }
+            if (message.get("buttons") != null) {
+                System.out.println("   Actions: " + message.get("buttons"));
+            }
+        } else if (routeId.startsWith("email")) {
+            System.out.println("\n📧 Email Notification:");
+            System.out.println("   Subject: " + message.get("subject"));
+            System.out.println("   Body: " + truncate(message.get("body").toString(), 100) + "...");
+        }
+    }
+    
+    public void printStatistics() {
+        System.out.println("Platform Statistics:");
+        System.out.println("├── Domains: " + domains.size());
+        System.out.println("├── Schemas: " + schemas.size());
+        System.out.println("├── Routes: " + routes.size());
+        System.out.println("├── Capabilities: " + capabilities.size());
+        System.out.println("├── Notifications Sent: " + totalSent);
+        System.out.println("├── Notifications Failed: " + totalFailed);
+        System.out.println("└── Success Rate: " + 
+            (totalSent + totalFailed > 0 ? 
+                String.format("%.1f%%", (totalSent * 100.0) / (totalSent + totalFailed)) : "N/A"));
+    }
+    
+    public void printStoredSchemas() {
+        for (JsonSchema schema : schemas.values()) {
+            System.out.println("MongoDB Document for: " + schema.getId());
+            System.out.println("{");
+            System.out.println("  \"_id\": \"" + schema.getId() + "\",");
+            System.out.println("  \"domain_id\": \"" + schema.getDomainId() + "\",");
+            System.out.println("  \"status\": \"active\",");
+            System.out.println("  \"created_at\": \"" + LocalDateTime.now() + "\",");
+            System.out.println("  \"json_schema\": {");
+            System.out.println("    \"$schema\": \"https://json-schema.org/draft/2020-12/schema\",");
+            System.out.println("    \"$id\": \"" + schema.getSchemaUri() + "\",");
+            System.out.println("    \"type\": \"object\",");
+            System.out.println("    \"properties\": {");
+            
+            for (Map.Entry<String, SchemaProperty> prop : schema.getProperties().entrySet()) {
+                System.out.println("      \"" + prop.getKey() + "\": {");
+                System.out.println("        \"type\": \"" + prop.getValue().getType() + "\",");
+                if (prop.getValue().getMinLength() > 0) {
+                    System.out.println("        \"minLength\": " + prop.getValue().getMinLength() + ",");
+                }
+                if (prop.getValue().getMaxLength() > 0) {
+                    System.out.println("        \"maxLength\": " + prop.getValue().getMaxLength() + ",");
+                }
+                System.out.println("      },");
+            }
+            
+            System.out.println("    },");
+            System.out.println("    \"required\": " + schema.getRequiredFields());
+            System.out.println("  }");
+            System.out.println("}\n");
+        }
+    }
+    
+    private String truncate(String str, int maxLength) {
+        return str.length() <= maxLength ? str : str.substring(0, maxLength);
+    }
+}
+
+// Domain Model
+class Domain {
+    private String id;
+    private String ownerTeam;
+    private Map<String, String> governance;
+    
+    public Domain(String id, String ownerTeam, Map<String, String> governance) {
+        this.id = id;
+        this.ownerTeam = ownerTeam;
+        this.governance = governance;
+    }
+    
+    public String getId() { return id; }
+    public String getOwnerTeam() { return ownerTeam; }
+    public Map<String, String> getGovernance() { return governance; }
+}
+
+// JSON Schema Model
+class JsonSchema {
+    private String id;
+    private String domainId;
+    private String schemaUri;
+    private Map<String, SchemaProperty> properties = new LinkedHashMap<>();
+    private List<String> requiredFields = new ArrayList<>();
+    
+    public JsonSchema(String id, String domainId) {
+        this.id = id;
+        this.domainId = domainId;
+    }
+    
+    public void setSchemaUri(String uri) {
+        this.schemaUri = uri;
+    }
+    
+    public void addProperty(String name, SchemaProperty property) {
+        properties.put(name, property);
+        if (property.isRequired()) {
+            requiredFields.add(name);
+        }
+    }
+    
+    public ValidationResult validate(Map<String, Object> message) {
+        List<String> errors = new ArrayList<>();
+        
+        // Check required fields
+        for (String required : requiredFields) {
+            if (!message.containsKey(required) || message.get(required) == null) {
+                errors.add("Missing required field: " + required);
+            }
+        }
+        
+        // Validate each field
+        for (Map.Entry<String, Object> entry : message.entrySet()) {
+            String fieldName = entry.getKey();
+            Object value = entry.getValue();
+            
+            SchemaProperty property = properties.get(fieldName);
+            if (property != null) {
+                // Type validation
+                if (!property.validateType(value)) {
+                    errors.add("Field '" + fieldName + "' has invalid type. Expected: " + property.getType());
+                }
+                
+                // String length validation
+                if (value instanceof String) {
+                    String strValue = (String) value;
+                    if (property.getMinLength() > 0 && strValue.length() < property.getMinLength()) {
+                        errors.add("Field '" + fieldName + "' is too short. Min: " + property.getMinLength());
+                    }
+                    if (property.getMaxLength() > 0 && strValue.length() > property.getMaxLength()) {
+                        errors.add("Field '" + fieldName + "' exceeds max length of " + 
+                            property.getMaxLength() + " (actual: " + strValue.length() + ")");
+                    }
+                    
+                    // Pattern validation
+                    if (property.getPattern() != null && !strValue.matches(property.getPattern())) {
+                        errors.add("Field '" + fieldName + "' doesn't match pattern: " + property.getPattern());
+                    }
+                    
+                    // Enum validation
+                    if (property.getEnumValues() != null && !property.getEnumValues().contains(strValue)) {
+                        errors.add("Field '" + fieldName + "' value '" + strValue + 
+                            "' not in allowed values: " + property.getEnumValues());
+                    }
+                }
+                
+                // Integer validation
+                if (value instanceof Integer) {
+                    int intValue = (Integer) value;
+                    if (intValue < property.getMinLength() || intValue > property.getMaxLength()) {
+                        errors.add("Field '" + fieldName + "' value " + intValue + 
+                            " out of range [" + property.getMinLength() + ", " + property.getMaxLength() + "]");
+                    }
+                }
+                
+                // Array validation
+                if (value instanceof List) {
+                    List<?> listValue = (List<?>) value;
+                    if (property.getMaxLength() > 0 && listValue.size() > property.getMaxLength()) {
+                        errors.add("Field '" + fieldName + "' array exceeds max items: " + property.getMaxLength());
+                    }
+                }
+            }
+        }
+        
+        return new ValidationResult(errors.isEmpty(), errors);
+    }
+    
+    public String getId() { return id; }
+    public String getDomainId() { return domainId; }
+    public String getSchemaUri() { return schemaUri; }
+    public Map<String, SchemaProperty> getProperties() { return properties; }
+    public List<String> getRequiredFields() { return requiredFields; }
+}
+
+// Schema Property Model
+class SchemaProperty {
+    private String type;
+    private int minLength;
+    private int maxLength;
+    private boolean required;
+    private String pattern;
+    private List<String> enumValues;
+    private Map<String, Object> itemSchema;
+    
+    public SchemaProperty(String type, int minLength, int maxLength, boolean required) {
+        this.type = type;
+        this.minLength = minLength;
+        this.maxLength = maxLength;
+        this.required = required;
+    }
+    
+    public SchemaProperty(String type, List<String> enumValues, boolean required) {
+        this.type = type;
+        this.enumValues = enumValues;
+        this.required = required;
+    }
+    
+    public SchemaProperty(String type, String pattern, boolean required) {
+        this.type = type;
+        this.pattern = pattern;
+        this.required = required;
+    }
+    
+    public SchemaProperty withPattern(String pattern) {
+        this.pattern = pattern;
+        return this;
+    }
+    
+    public void setItemSchema(Map<String, Object> itemSchema) {
+        this.itemSchema = itemSchema;
+    }
+    
+    public boolean validateType(Object value) {
+        switch (type) {
+            case "string":
+                return value instanceof String;
+            case "integer":
+                return value instanceof Integer;
+            case "array":
+                return value instanceof List;
+            case "object":
+                return value instanceof Map;
+            default:
+                return true;
+        }
+    }
+    
+    // Getters
+    public String getType() { return type; }
+    public int getMinLength() { return minLength; }
+    public int getMaxLength() { return maxLength; }
+    public boolean isRequired() { return required; }
+    public String getPattern() { return pattern; }
+    public List<String> getEnumValues() { return enumValues; }
+}
+
+// Route Model
+class Route {
+    private String id;
+    private String domainId;
+    private String schemaId;
+    
+    public Route(String id, String domainId, String schemaId) {
+        this.id = id;
+        this.domainId = domainId;
+        this.schemaId = schemaId;
+    }
+    
+    public String getId() { return id; }
+    public String getDomainId() { return domainId; }
+    public String getSchemaId() { return schemaId; }
+}
+
+// Capability Model
+class Capability {
+    private String id;
+    private String description;
+    private Set<String> supportedRoutes = new HashSet<>();
+    
+    public Capability(String id, String description) {
+        this.id = id;
+        this.description = description;
+    }
+    
+    public void addSupportedRoute(String route) {
+        supportedRoutes.add(route);
+    }
+    
+    public boolean supportsRoute(String route) {
+        return supportedRoutes.contains(route);
+    }
+    
+    public String getId() { return id; }
+    public String getDescription() { return description; }
+}
+
+// Notification Request Model (exact payload structure)
+class NotificationRequest {
+    private String capability;
+    private List<String> recipients = new ArrayList<>();
+    private List<NotificationPayload> payloads = new ArrayList<>();
+    
+    public void setCapability(String capability) {
+        this.capability = capability;
+    }
+    
+    public void addRecipient(String recipient) {
+        recipients.add(recipient);
+    }
+    
+    public void addPayload(NotificationPayload payload) {
+        payloads.add(payload);
+    }
+    
+    public String getCapability() { return capability; }
+    public List<String> getRecipients() { return recipients; }
+    public List<NotificationPayload> getPayloads() { return payloads; }
+}
+
+// Notification Payload Model
+class NotificationPayload {
+    private String route;
+    private Map<String, Object> message;
+    
+    public void setRoute(String route) {
+        this.route = route;
+    }
+    
+    public void setMessage(Map<String, Object> message) {
+        this.message = message;
+    }
+    
+    public String getRoute() { return route; }
+    public Map<String, Object> getMessage() { return message; }
+}
+
+// Validation Result Model
+class ValidationResult {
+    private boolean valid;
+    private List<String> errors;
+    
+    public ValidationResult(boolean valid, List<String> errors) {
+        this.valid = valid;
+        this.errors = errors;
+    }
+    
+    public boolean isValid() { return valid; }
+    public List<String> getErrors() { return errors; }
+}
+
+// Notification Log Model
+class NotificationLog {
+    private String recipient;
+    private String route;
+    private LocalDateTime timestamp;
+    private boolean success;
+    private String schemaUsed;
+    
+    public NotificationLog(String recipient, String route, LocalDateTime timestamp, 
+                           boolean success, String schemaUsed) {
+        this.recipient = recipient;
+        this.route = route;
+        this.timestamp = timestamp;
+        this.success = success;
+        this.schemaUsed = schemaUsed;
+    }
+    
+    public String getRecipient() { return recipient; }
+    public String getRoute() { return route; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public boolean isSuccess() { return success; }
+    public String getSchemaUsed() { return schemaUsed; }
+}
