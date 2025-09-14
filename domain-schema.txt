@@ -1,0 +1,474 @@
+import java.util.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
+// Main Application
+public class NotificationPlatformDemo {
+    public static void main(String[] args) {
+        // Initialize the platform
+        NotificationPlatform platform = new NotificationPlatform();
+        
+        // Setup domains
+        setupDomains(platform);
+        
+        // Setup schemas
+        setupSchemas(platform);
+        
+        // Setup routes
+        setupRoutes(platform);
+        
+        // Setup capabilities
+        setupCapabilities(platform);
+        
+        // Demo 1: Send workspace booking notification
+        System.out.println("=== DEMO 1: Workspace Booking Notification ===\n");
+        sendBookingNotification(platform);
+        
+        // Demo 2: Send learning assignment notification
+        System.out.println("\n=== DEMO 2: Learning Assignment Notification ===\n");
+        sendLearningNotification(platform);
+        
+        // Demo 3: Show validation error
+        System.out.println("\n=== DEMO 3: Validation Error Example ===\n");
+        demonstrateValidationError(platform);
+        
+        // Demo 4: Show platform statistics
+        System.out.println("\n=== PLATFORM STATISTICS ===\n");
+        platform.printStatistics();
+    }
+    
+    private static void setupDomains(NotificationPlatform platform) {
+        platform.registerDomain(new Domain("mobile.push.jpmc", "Mobile Platform Team", 
+            Map.of("max_title_length", "25", "max_body_length", "50")));
+        platform.registerDomain(new Domain("desktop.rich.jpmc", "Desktop Platform Team",
+            Map.of("max_title_length", "100", "max_body_length", "300")));
+        platform.registerDomain(new Domain("email.formal.jpmc", "Email Platform Team",
+            Map.of("max_subject_length", "100", "max_body_length", "2000")));
+    }
+    
+    private static void setupSchemas(NotificationPlatform platform) {
+        // Mobile push schema
+        Schema mobilePushV1 = new Schema("mobile.push.v1", "mobile.push.jpmc");
+        mobilePushV1.addField("title", "string", 25, true);
+        mobilePushV1.addField("body", "string", 50, true);
+        mobilePushV1.addField("action_url", "string", 200, false);
+        platform.registerSchema(mobilePushV1);
+        
+        // Desktop rich schema
+        Schema desktopRichV1 = new Schema("desktop.rich.v1", "desktop.rich.jpmc");
+        desktopRichV1.addField("header", "string", 50, false);
+        desktopRichV1.addField("title", "string", 100, true);
+        desktopRichV1.addField("body", "string", 300, true);
+        desktopRichV1.addField("footer", "string", 100, false);
+        platform.registerSchema(desktopRichV1);
+        
+        // Email formal schema
+        Schema emailFormalV1 = new Schema("email.formal.v1", "email.formal.jpmc");
+        emailFormalV1.addField("subject", "string", 100, true);
+        emailFormalV1.addField("body", "string", 2000, true);
+        emailFormalV1.addField("cc", "string", 500, false);
+        platform.registerSchema(emailFormalV1);
+    }
+    
+    private static void setupRoutes(NotificationPlatform platform) {
+        platform.registerRoute(new Route("mobile.myworkspace", "mobile.push.jpmc", "mobile.push.v1"));
+        platform.registerRoute(new Route("desktop.myworkspace", "desktop.rich.jpmc", "desktop.rich.v1"));
+        platform.registerRoute(new Route("email.myworkspace", "email.formal.jpmc", "email.formal.v1"));
+    }
+    
+    private static void setupCapabilities(NotificationPlatform platform) {
+        Capability bookSeat = new Capability("book_a_seat", "Workspace reservation confirmations");
+        bookSeat.addSupportedRoute("mobile.myworkspace");
+        bookSeat.addSupportedRoute("desktop.myworkspace");
+        bookSeat.addSupportedRoute("email.myworkspace");
+        platform.registerCapability(bookSeat);
+        
+        Capability learning = new Capability("learning_assignment", "Training assignment notifications");
+        learning.addSupportedRoute("mobile.myworkspace");
+        learning.addSupportedRoute("desktop.myworkspace");
+        learning.addSupportedRoute("email.myworkspace");
+        platform.registerCapability(learning);
+    }
+    
+    private static void sendBookingNotification(NotificationPlatform platform) {
+        NotificationRequest request = new NotificationRequest("book_a_seat");
+        request.addRecipient("john.doe@jpmc.com");
+        
+        // Mobile notification
+        Map<String, Object> mobileMessage = new HashMap<>();
+        mobileMessage.put("title", "Seat Reserved");
+        mobileMessage.put("body", "Desk 42A booked for tomorrow");
+        mobileMessage.put("action_url", "myworkspace://booking/123");
+        request.addPayload(new NotificationPayload("mobile.myworkspace", mobileMessage));
+        
+        // Desktop notification
+        Map<String, Object> desktopMessage = new HashMap<>();
+        desktopMessage.put("header", "JPMC Workspace");
+        desktopMessage.put("title", "Workspace Reservation Confirmed");
+        desktopMessage.put("body", "Your desk reservation for Desk 42A on Floor 3 has been confirmed for September 13, 2025 from 9:00 AM to 6:00 PM");
+        desktopMessage.put("footer", "Questions? Contact facilities@jpmc.com");
+        request.addPayload(new NotificationPayload("desktop.myworkspace", desktopMessage));
+        
+        // Email notification
+        Map<String, Object> emailMessage = new HashMap<>();
+        emailMessage.put("subject", "Workspace Booking Confirmation - Desk 42A");
+        emailMessage.put("body", "Dear John,\n\nYour workspace reservation has been confirmed:\n\n" +
+            "Location: Desk 42A, Floor 3\nDate: September 13, 2025\nTime: 9:00 AM - 6:00 PM\n\n" +
+            "Please arrive 10 minutes early for security check-in.\n\nBest regards,\nJPMC Facilities Team");
+        request.addPayload(new NotificationPayload("email.myworkspace", emailMessage));
+        
+        platform.send(request);
+    }
+    
+    private static void sendLearningNotification(NotificationPlatform platform) {
+        NotificationRequest request = new NotificationRequest("learning_assignment");
+        request.addRecipient("jane.smith@jpmc.com");
+        
+        // Mobile notification
+        Map<String, Object> mobileMessage = new HashMap<>();
+        mobileMessage.put("title", "New Training");
+        mobileMessage.put("body", "Complete Compliance Training by Oct 1");
+        request.addPayload(new NotificationPayload("mobile.myworkspace", mobileMessage));
+        
+        // Desktop notification
+        Map<String, Object> desktopMessage = new HashMap<>();
+        desktopMessage.put("title", "New Training Assignment");
+        desktopMessage.put("body", "You have been assigned 'Annual Compliance Training 2025'. This mandatory training must be completed by October 1, 2025. Estimated time: 45 minutes.");
+        request.addPayload(new NotificationPayload("desktop.myworkspace", desktopMessage));
+        
+        platform.send(request);
+    }
+    
+    private static void demonstrateValidationError(NotificationPlatform platform) {
+        NotificationRequest request = new NotificationRequest("book_a_seat");
+        request.addRecipient("test@jpmc.com");
+        
+        // This will fail validation - title too long for mobile
+        Map<String, Object> mobileMessage = new HashMap<>();
+        mobileMessage.put("title", "This title is way too long for mobile push notifications and will fail validation");
+        mobileMessage.put("body", "Test body");
+        request.addPayload(new NotificationPayload("mobile.myworkspace", mobileMessage));
+        
+        platform.send(request);
+    }
+}
+
+// Core Platform Classes
+class NotificationPlatform {
+    private Map<String, Domain> domains = new HashMap<>();
+    private Map<String, Schema> schemas = new HashMap<>();
+    private Map<String, Route> routes = new HashMap<>();
+    private Map<String, Capability> capabilities = new HashMap<>();
+    private List<NotificationLog> logs = new ArrayList<>();
+    private int successCount = 0;
+    private int failureCount = 0;
+    
+    public void registerDomain(Domain domain) {
+        domains.put(domain.getId(), domain);
+        System.out.println("✓ Registered domain: " + domain.getId());
+    }
+    
+    public void registerSchema(Schema schema) {
+        schemas.put(schema.getId(), schema);
+        System.out.println("✓ Registered schema: " + schema.getId());
+    }
+    
+    public void registerRoute(Route route) {
+        routes.put(route.getId(), route);
+        System.out.println("✓ Registered route: " + route.getId());
+    }
+    
+    public void registerCapability(Capability capability) {
+        capabilities.put(capability.getId(), capability);
+        System.out.println("✓ Registered capability: " + capability.getId());
+    }
+    
+    public void send(NotificationRequest request) {
+        System.out.println("Processing notification for capability: " + request.getCapability());
+        System.out.println("Recipients: " + String.join(", ", request.getRecipients()));
+        
+        Capability capability = capabilities.get(request.getCapability());
+        if (capability == null) {
+            System.out.println("❌ Error: Unknown capability: " + request.getCapability());
+            failureCount++;
+            return;
+        }
+        
+        for (NotificationPayload payload : request.getPayloads()) {
+            processPayload(capability, payload, request.getRecipients());
+        }
+    }
+    
+    private void processPayload(Capability capability, NotificationPayload payload, List<String> recipients) {
+        String routeId = payload.getRoute();
+        Route route = routes.get(routeId);
+        
+        if (route == null) {
+            System.out.println("❌ Error: Unknown route: " + routeId);
+            failureCount++;
+            return;
+        }
+        
+        if (!capability.supportsRoute(routeId)) {
+            System.out.println("❌ Error: Capability " + capability.getId() + " doesn't support route " + routeId);
+            failureCount++;
+            return;
+        }
+        
+        Schema schema = schemas.get(route.getSchemaId());
+        if (schema == null) {
+            System.out.println("❌ Error: Schema not found: " + route.getSchemaId());
+            failureCount++;
+            return;
+        }
+        
+        // Validate message against schema
+        ValidationResult validation = schema.validate(payload.getMessage());
+        if (!validation.isValid()) {
+            System.out.println("❌ Validation failed for route " + routeId + ":");
+            for (String error : validation.getErrors()) {
+                System.out.println("   - " + error);
+            }
+            failureCount++;
+            return;
+        }
+        
+        // Simulate sending to platform plugin
+        Domain domain = domains.get(route.getDomainId());
+        System.out.println("✓ Sending via " + domain.getId() + " (owned by " + domain.getOwnerTeam() + "):");
+        
+        // Display formatted message based on platform type
+        if (routeId.startsWith("mobile")) {
+            System.out.println("   📱 Mobile Push Notification:");
+            System.out.println("      Title: " + payload.getMessage().get("title"));
+            System.out.println("      Body: " + payload.getMessage().get("body"));
+        } else if (routeId.startsWith("desktop")) {
+            System.out.println("   💻 Desktop Rich Notification:");
+            if (payload.getMessage().get("header") != null) {
+                System.out.println("      Header: " + payload.getMessage().get("header"));
+            }
+            System.out.println("      Title: " + payload.getMessage().get("title"));
+            System.out.println("      Body: " + payload.getMessage().get("body"));
+            if (payload.getMessage().get("footer") != null) {
+                System.out.println("      Footer: " + payload.getMessage().get("footer"));
+            }
+        } else if (routeId.startsWith("email")) {
+            System.out.println("   📧 Email:");
+            System.out.println("      Subject: " + payload.getMessage().get("subject"));
+            System.out.println("      Body: " + truncate(payload.getMessage().get("body").toString(), 100) + "...");
+        }
+        
+        // Log the notification
+        for (String recipient : recipients) {
+            logs.add(new NotificationLog(recipient, routeId, LocalDateTime.now(), true));
+        }
+        successCount++;
+        System.out.println("   ✓ Delivered to " + recipients.size() + " recipient(s)");
+    }
+    
+    public void printStatistics() {
+        System.out.println("Platform Statistics:");
+        System.out.println("├── Total Domains: " + domains.size());
+        System.out.println("├── Total Schemas: " + schemas.size());
+        System.out.println("├── Total Routes: " + routes.size());
+        System.out.println("├── Total Capabilities: " + capabilities.size());
+        System.out.println("├── Notifications Sent: " + successCount);
+        System.out.println("├── Notifications Failed: " + failureCount);
+        System.out.println("└── Success Rate: " + 
+            (successCount + failureCount > 0 ? 
+                String.format("%.1f%%", (successCount * 100.0) / (successCount + failureCount)) : "N/A"));
+    }
+    
+    private String truncate(String str, int maxLength) {
+        if (str.length() <= maxLength) return str;
+        return str.substring(0, maxLength);
+    }
+}
+
+// Domain Model
+class Domain {
+    private String id;
+    private String ownerTeam;
+    private Map<String, String> governance;
+    
+    public Domain(String id, String ownerTeam, Map<String, String> governance) {
+        this.id = id;
+        this.ownerTeam = ownerTeam;
+        this.governance = governance;
+    }
+    
+    public String getId() { return id; }
+    public String getOwnerTeam() { return ownerTeam; }
+    public Map<String, String> getGovernance() { return governance; }
+}
+
+// Schema Model
+class Schema {
+    private String id;
+    private String domainId;
+    private Map<String, SchemaField> fields = new HashMap<>();
+    
+    public Schema(String id, String domainId) {
+        this.id = id;
+        this.domainId = domainId;
+    }
+    
+    public void addField(String name, String type, int maxLength, boolean required) {
+        fields.put(name, new SchemaField(name, type, maxLength, required));
+    }
+    
+    public ValidationResult validate(Map<String, Object> message) {
+        List<String> errors = new ArrayList<>();
+        
+        // Check required fields
+        for (SchemaField field : fields.values()) {
+            if (field.isRequired() && !message.containsKey(field.getName())) {
+                errors.add("Required field missing: " + field.getName());
+            }
+        }
+        
+        // Validate field constraints
+        for (Map.Entry<String, Object> entry : message.entrySet()) {
+            SchemaField field = fields.get(entry.getKey());
+            if (field != null && entry.getValue() != null) {
+                String value = entry.getValue().toString();
+                if (value.length() > field.getMaxLength()) {
+                    errors.add("Field '" + field.getName() + "' exceeds max length of " + 
+                        field.getMaxLength() + " (actual: " + value.length() + ")");
+                }
+            }
+        }
+        
+        return new ValidationResult(errors.isEmpty(), errors);
+    }
+    
+    public String getId() { return id; }
+    public String getDomainId() { return domainId; }
+}
+
+class SchemaField {
+    private String name;
+    private String type;
+    private int maxLength;
+    private boolean required;
+    
+    public SchemaField(String name, String type, int maxLength, boolean required) {
+        this.name = name;
+        this.type = type;
+        this.maxLength = maxLength;
+        this.required = required;
+    }
+    
+    public String getName() { return name; }
+    public String getType() { return type; }
+    public int getMaxLength() { return maxLength; }
+    public boolean isRequired() { return required; }
+}
+
+class ValidationResult {
+    private boolean valid;
+    private List<String> errors;
+    
+    public ValidationResult(boolean valid, List<String> errors) {
+        this.valid = valid;
+        this.errors = errors;
+    }
+    
+    public boolean isValid() { return valid; }
+    public List<String> getErrors() { return errors; }
+}
+
+// Route Model
+class Route {
+    private String id;
+    private String domainId;
+    private String schemaId;
+    
+    public Route(String id, String domainId, String schemaId) {
+        this.id = id;
+        this.domainId = domainId;
+        this.schemaId = schemaId;
+    }
+    
+    public String getId() { return id; }
+    public String getDomainId() { return domainId; }
+    public String getSchemaId() { return schemaId; }
+}
+
+// Capability Model
+class Capability {
+    private String id;
+    private String description;
+    private Set<String> supportedRoutes = new HashSet<>();
+    
+    public Capability(String id, String description) {
+        this.id = id;
+        this.description = description;
+    }
+    
+    public void addSupportedRoute(String route) {
+        supportedRoutes.add(route);
+    }
+    
+    public boolean supportsRoute(String route) {
+        return supportedRoutes.contains(route);
+    }
+    
+    public String getId() { return id; }
+    public String getDescription() { return description; }
+}
+
+// Request/Response Models
+class NotificationRequest {
+    private String capability;
+    private List<String> recipients = new ArrayList<>();
+    private List<NotificationPayload> payloads = new ArrayList<>();
+    
+    public NotificationRequest(String capability) {
+        this.capability = capability;
+    }
+    
+    public void addRecipient(String recipient) {
+        recipients.add(recipient);
+    }
+    
+    public void addPayload(NotificationPayload payload) {
+        payloads.add(payload);
+    }
+    
+    public String getCapability() { return capability; }
+    public List<String> getRecipients() { return recipients; }
+    public List<NotificationPayload> getPayloads() { return payloads; }
+}
+
+class NotificationPayload {
+    private String route;
+    private Map<String, Object> message;
+    
+    public NotificationPayload(String route, Map<String, Object> message) {
+        this.route = route;
+        this.message = message;
+    }
+    
+    public String getRoute() { return route; }
+    public Map<String, Object> getMessage() { return message; }
+}
+
+class NotificationLog {
+    private String recipient;
+    private String route;
+    private LocalDateTime timestamp;
+    private boolean success;
+    
+    public NotificationLog(String recipient, String route, LocalDateTime timestamp, boolean success) {
+        this.recipient = recipient;
+        this.route = route;
+        this.timestamp = timestamp;
+        this.success = success;
+    }
+    
+    public String getRecipient() { return recipient; }
+    public String getRoute() { return route; }
+    public LocalDateTime getTimestamp() { return timestamp; }
+    public boolean isSuccess() { return success; }
+}
