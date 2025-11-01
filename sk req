@@ -1,0 +1,499 @@
+Dashboard Panels - Detailed Requirements
+1. Executive Summary Panel
+Panel Type: Single Value Visualizations with Sparklines
+Position: Top row, full width
+Refresh Rate: 5 minutes
+Metrics Display Requirements:
+
+Total Notifications Sent
+
+Three time period toggles: 24h, 7d, 30d
+Color coding: Green (meeting target), Yellow (10% below), Red (20% below)
+Comparison with previous period percentage
+Sparkline showing trend
+
+
+Overall Delivery Success Rate
+
+Large percentage display with decimal precision
+Traffic light indicator based on SLA thresholds
+Breakdown link to channel-specific rates
+Target line indicator at 99%
+
+
+Active Users/Devices Count
+
+Unique recipients count
+Active devices by type (iOS, Android, Web)
+Growth/decline indicator vs previous period
+Clickable for user distribution details
+
+
+System Health Status Indicator
+
+Composite health score (0-100)
+Service status lights for each component
+Red/Yellow/Green overall status
+Link to detailed system health dashboard
+
+
+Cost Metrics
+
+Total cost current period
+Cost per notification by channel
+Budget utilization percentage
+Projected monthly cost
+
+
+
+2. Real-Time Metrics Panel
+Panel Type: Time Series Line Graphs and Gauges
+Position: Second row
+Refresh Rate: Real-time (5 seconds)
+Display Requirements:
+
+Notifications per Second
+
+Live updating line graph (60-second window)
+Current value in large text
+Peak value indicator
+Threshold line for capacity
+
+
+Current Queue Depth by Channel
+
+Stacked area chart for all queues
+Individual queue meters
+Alert thresholds (warning at 1000, critical at 5000)
+Queue names: ios_queue, android_queue, email_queue, teams_queue
+
+
+Active Processing Threads
+
+Thread pool utilization gauge
+Available vs busy threads
+Thread pool name breakdown
+Historical trend (last hour)
+
+
+API Request Rate
+
+Requests per second counter
+Success vs failure rate
+Response time distribution
+Rate limit utilization
+
+
+Error Rate
+
+5-minute rolling window
+Error percentage with trend arrow
+Error count absolute number
+Link to error details
+
+
+
+3. Channel Performance Panel
+Panel Type: Grouped Bar Charts and Status Indicators
+Position: Left side, spanning two rows
+Refresh Rate: 1 minute
+Metrics per Channel (ios.jpmc.ex.work, android.jpmc.ex.work, email.smtp.default, teams.microsoft.outlook):
+
+Delivery Rates
+
+Success percentage bar chart
+Absolute numbers (sent/delivered)
+Trend indicators
+Target line at 99%
+
+
+Average Delivery Time
+
+Bar chart with time values
+Color coding by performance tier
+Channel comparison view
+P50, P95 values shown
+
+
+Channel-Specific Failure Rates
+
+Failure percentage by reason
+Top 3 failure reasons listed
+Retry success rate
+Time since last failure
+
+
+Channel Availability Status
+
+Green/Red status indicator
+Uptime percentage (24h)
+Last incident timestamp
+Circuit breaker status
+
+
+Retry Attempts
+
+Retry count by attempt number
+Success rate per retry attempt
+Average retries needed
+Retry queue depth
+
+
+
+4. Delivery Status Breakdown Panel
+Panel Type: Mixed Visualizations
+Position: Center main area
+Refresh Rate: 30 seconds
+Visualization Requirements:
+
+Status Distribution Pie Chart
+
+Segments: Sent, Delivered, Failed, Pending, Expired
+Click-through to filtered list
+Percentage and count labels
+Legend with color coding
+
+
+Time-Series Status Graph
+
+Stacked area chart (24-hour view)
+Status categories over time
+Adjustable time range
+Event annotations for incidents
+
+
+Delivery Funnel
+
+Stages: Triggered → Routed → Filtered → Sent → Delivered → Read
+Drop-off percentages between stages
+Volume at each stage
+Clickable stages for details
+
+
+Bounce/Rejection Rates
+
+Rate by rejection type
+Trending over last 7 days
+Channel-specific breakdown
+Top rejection reasons
+
+
+Undeliverable Reasons
+
+Horizontal bar chart
+Categories: Invalid token, User offline, Rate limited, Blocked
+Count and percentage for each
+Drill-down to affected users
+
+
+
+5. Error Analysis Panel
+Panel Type: Tables and Heat Maps
+Position: Bottom section
+Refresh Rate: 1 minute
+Error Tracking Requirements:
+
+Top Error Types Table
+
+Error message/type
+Frequency count
+Affected services
+First/Last occurrence
+Trend sparkline
+
+
+Failed Notifications by Reason
+
+Grouped bar chart by failure category
+Time distribution heat map
+Affected notification IDs
+Recovery status
+
+
+Channel-Specific Errors
+
+Error matrix (channel x error type)
+Color intensity by frequency
+Click for error details
+Resolution status
+
+
+API Error Responses
+
+4xx errors breakdown
+5xx errors breakdown
+Error rate by endpoint
+Response time correlation
+
+
+Timeout Incidents
+
+Services experiencing timeouts
+Frequency and duration
+Impact (notifications affected)
+Root cause indicators
+
+
+
+6. Performance Metrics Panel
+Panel Type: Histograms and Percentile Charts
+Position: Right side panel
+Refresh Rate: 1 minute
+Latency Metrics:
+
+Delivery Latency by Channel
+
+Box plot showing distribution
+Min, Max, Median values
+Outlier identification
+SLA threshold lines
+
+
+Percentile Distribution
+
+P50, P75, P90, P95, P99 values
+Time-series for each percentile
+Channel comparison
+Alert on P99 > 10 seconds
+
+
+Processing Time Distribution
+
+Histogram with buckets
+Stage-by-stage breakdown
+Queue time vs processing time
+Bottleneck identification
+
+
+Queue Wait Times
+
+Average wait by queue
+Maximum wait times
+Queue efficiency score
+Time in queue distribution
+
+
+Database Query Performance
+
+Query execution times
+Slow query log
+Connection pool metrics
+Cache hit rates
+
+
+
+7. User Engagement Panel
+Panel Type: Combination Charts
+Position: Separate tab or scrollable section
+Refresh Rate: 5 minutes
+Engagement Metrics:
+
+Notification Open Rates
+
+By channel and capability
+Time to open distribution
+Comparison with industry benchmarks
+Trending over 30 days
+
+
+Click-Through Rates
+
+Action button clicks
+Deep link success rate
+By notification type
+User segment comparison
+
+
+Opt-out/Unsubscribe Trends
+
+Daily opt-out count
+By capability/channel
+Reasons for opt-out
+Re-engagement success
+
+
+Active Users by Time
+
+24-hour heat map
+Peak activity periods
+By timezone
+Presence correlation
+
+
+Device Type Distribution
+
+Pie chart of device types
+OS version breakdown
+App version distribution
+Device capability matrix
+
+
+
+8. Geographic Distribution Panel
+Panel Type: Maps and Regional Charts
+Position: Full-width panel
+Refresh Rate: 5 minutes
+Geographic Metrics:
+
+World Map Visualization
+
+Heat map by notification volume
+Click for country details
+Success rate color overlay
+Real-time animation option
+
+
+Delivery Success by Geography
+
+Table with countries/regions
+Success rates per region
+Volume indicators
+Latency by region
+
+
+Regional Latency
+
+Average latency by country
+Network path visualization
+CDN effectiveness
+Cross-region performance
+
+
+Time Zone Distribution
+
+Notifications by timezone
+Quiet hours impact
+Optimal send times
+Local time considerations
+
+
+
+9. Traffic Patterns Panel
+Panel Type: Time-based Visualizations
+Position: Dashboard tab
+Refresh Rate: 5 minutes
+Pattern Analysis:
+
+Hourly Volume Chart
+
+24-hour bar chart
+Weekday vs weekend comparison
+Average vs current
+Capacity utilization
+
+
+Peak Usage Indicators
+
+Top 5 peak times
+Duration of peaks
+System load during peaks
+Queue depth correlation
+
+
+Day-over-Day Comparison
+
+Line chart overlay
+Percentage change
+Anomaly detection
+Trend analysis
+
+
+Weekly Trends
+
+7-day rolling average
+Day of week patterns
+Seasonal adjustments
+Forecast projection
+
+
+Campaign Impact Spikes
+
+Event annotations
+Volume spike detection
+System impact assessment
+Capacity planning data
+
+
+
+10. Alerts & Anomalies Panel
+Panel Type: Alert List and Anomaly Detection
+Position: Top banner and dedicated panel
+Refresh Rate: Real-time
+Alert Requirements:
+
+Critical Error Alerts
+
+Red banner for P1 issues
+Service affecting errors
+Escalation status
+Time to resolution tracking
+
+
+Unusual Traffic Patterns
+
+Statistical anomaly detection
+Deviation from baseline
+Pattern recognition
+Automated alert generation
+
+
+SLA Breach Warnings
+
+Delivery rate below 95%
+Latency above thresholds
+Queue depth warnings
+Capacity warnings
+
+
+Delivery Rate Drops
+
+Sudden drop detection (>10%)
+Channel-specific alerts
+Root cause indicators
+Recovery monitoring
+
+
+System Resource Alerts
+
+CPU > 80%
+Memory > 90%
+Disk space warnings
+Connection pool exhaustion
+
+
+
+Additional Requirements
+Data Retention
+
+Real-time data: 24 hours
+Aggregated metrics: 90 days
+Summary statistics: 1 year
+Compliance data: 7 years
+
+Access Control
+
+Executive view: Summary panels only
+Operations: Full access
+Development: Debug panels included
+Support: Read-only access
+
+Export Capabilities
+
+PDF reports for executives
+CSV data export
+API for metrics extraction
+Scheduled report generation
+
+Mobile Responsiveness
+
+Responsive grid layout
+Touch-friendly controls
+Critical metrics prioritized
+Simplified mobile view option
+
+Integration Points
+
+Alert forwarding to PagerDuty
+Slack notifications for critical alerts
+JIRA ticket creation for incidents
+Metrics API for external consumption
